@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Downloader</title>
+<style>
+  :root {
+    --bg: #0d0f14; --card: #161a22; --card2: #1c212c;
+    --line: #2a3140; --text: #e8ecf3; --muted: #93a0b4;
+    --accent: #ff4d4d; --accent2: #ff7a5c; --ok: #3ecf8e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -100px, #1b2233 0%, var(--bg) 60%);
+    color: var(--text); min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center; padding: 40px 16px;
+  }
+  main { width: 100%; max-width: 660px; }
+  header { text-align: center; margin-bottom: 28px; }
+  .logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 40px; border-radius: 12px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    box-shadow: 0 8px 24px rgba(255,77,77,.35);
+  }
+  .logo svg { width: 18px; height: 18px; fill: #fff; margin-left: 3px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; padding: 20px; margin-bottom: 16px;
+  }
+  .urlrow { display: flex; gap: 10px; }
+  input[type=url] {
+    flex: 1; background: var(--card2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 10px; padding: 13px 14px; font-size: 15px;
+    outline: none; min-width: 0;
+  }
+  input[type=url]:focus { border-color: var(--accent); }
+  input[type=url]::placeholder { color: #5b6575; }
+  button {
+    border: 0; cursor: pointer; font-size: 15px; font-weight: 600;
+    border-radius: 10px; padding: 13px 22px; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    transition: filter .15s, transform .05s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.1); }
+  button:active:not(:disabled) { transform: scale(.98); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: var(--card2); border: 1px solid var(--line); color: var(--text); }
+  button.ok { background: linear-gradient(135deg, #2fae74, #3ecf8e); }
+
+  .error {
+    background: #2a1620; border: 1px solid #5c2b3a; color: #ffb3c1;
+    border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-top: 14px;
+    white-space: pre-wrap; word-break: break-word; display: none;
+  }
+  .note {
+    background: #1a2233; border: 1px solid #30405e; color: #a8c2ee;
+    border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-top: 14px; display: none;
+  }
+
+  .video { display: none; gap: 16px; align-items: flex-start; }
+  .video img {
+    width: 200px; aspect-ratio: 16/9; object-fit: cover;
+    border-radius: 10px; background: var(--card2); flex-shrink: 0;
+  }
+  .vmeta { min-width: 0; }
+  .vmeta h2 {
+    font-size: 16px; font-weight: 600; line-height: 1.35; margin-bottom: 6px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .vmeta .row { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .vmeta .row span + span::before { content: " • "; }
+
+  .pickrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select {
+    background: var(--card2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 11px 12px; font-size: 14px; outline: none; flex: 1;
+    min-width: 180px;
+  }
+  select:focus { border-color: var(--accent); }
+
+  .dl { display: none; }
+  .bar {
+    height: 10px; background: var(--card2); border-radius: 99px;
+    overflow: hidden; margin: 6px 0 10px; border: 1px solid var(--line);
+  }
+  .bar > div {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px; transition: width .4s ease;
+  }
+  .bar.indet > div { width: 35% !important; animation: slide 1.1s infinite ease-in-out; }
+  @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+  .stats { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
+  .phase { color: var(--text); font-weight: 600; font-size: 14px; }
+
+  .done { display: none; text-align: center; padding: 8px 0 2px; }
+  .done .fname {
+    color: var(--muted); font-size: 13px; margin: 10px 0 16px;
+    word-break: break-all;
+  }
+  .done .fname b { color: var(--text); }
+  .donebtns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  a.savebtn {
+    display: inline-block; text-decoration: none;
+    border: 0; cursor: pointer; font-size: 15px; font-weight: 600;
+    border-radius: 10px; padding: 13px 26px; color: #fff;
+    background: linear-gradient(135deg, #2fae74, #3ecf8e);
+    box-shadow: 0 8px 24px rgba(62,207,142,.25);
+  }
+  .spin {
+    display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+    animation: rot .7s linear infinite; vertical-align: -3px; margin-right: 8px;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  footer { color: #5b6575; font-size: 12px; text-align: center; margin-top: 10px; line-height: 1.6; }
+  @media (max-width: 560px) {
+    .video { flex-direction: column; }
+    .video img { width: 100%; }
+    .urlrow { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+    <h1>YouTube Downloader</h1>
+    <div class="sub">Paste a link · pick a quality · save the file</div>
+  </header>
+
+  <!-- Step 1: URL -->
+  <div class="card" id="urlCard">
+    <form class="urlrow" id="fetchForm">
+      <input id="url" type="url" required placeholder="https://www.youtube.com/watch?v=…"
+             autocomplete="off" spellcheck="false">
+      <button id="fetchBtn" type="submit">Fetch</button>
+    </form>
+    <div class="error" id="errBox"></div>
+    <div class="note" id="noteBox"></div>
+  </div>
+
+  <!-- Step 2: video info + quality -->
+  <div class="card" id="videoCard" style="display:none">
+    <div class="video" id="video">
+      <img id="thumb" alt="thumbnail">
+      <div class="vmeta">
+        <h2 id="title"></h2>
+        <div class="row">
+          <span id="channel"></span><span id="duration"></span><span id="views"></span>
+        </div>
+        <div class="pickrow">
+          <select id="quality"></select>
+          <button id="dlBtn">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: progress / done -->
+  <div class="card dl" id="dlCard">
+    <div id="progWrap">
+      <div class="phase" id="phase">Starting…</div>
+      <div class="bar" id="bar"><div id="barFill"></div></div>
+      <div class="stats">
+        <span id="pct"></span>
+        <span id="speedEta"></span>
+      </div>
+    </div>
+    <div class="done" id="doneWrap">
+      <div style="font-size:34px">✅</div>
+      <div class="fname">Ready — <b id="fname"></b> <span id="fsize"></span></div>
+      <div class="donebtns">
+        <a class="savebtn" id="saveLink" href="#">Save file</a>
+        <button class="secondary" id="againBtn">Download another</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Downloaded files are kept on the server for 2 hours.<br>
+    Only download content you own or that is freely licensed — respect YouTube's Terms of Service and copyright.
+  </footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let videoInfo = null, pollTimer = null;
+
+const fmtDur = s => {
+  if (!s && s !== 0) return "";
+  s = Math.round(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
+           : `${m}:${String(sec).padStart(2,"0")}`;
+};
+const fmtViews = n => n == null ? "" :
+  (n >= 1e6 ? (n/1e6).toFixed(1).replace(/\.0$/,"") + "M views"
+            : n >= 1e3 ? (n/1e3).toFixed(1).replace(/\.0$/,"") + "K views" : n + " views");
+const fmtSpeed = b => b == null ? "" :
+  (b >= 1048576 ? (b/1048576).toFixed(1) + " MB/s" : (b/1024).toFixed(0) + " KB/s");
+
+function showError(msg) {
+  $("errBox").textContent = msg; $("errBox").style.display = msg ? "block" : "none";
+}
+function showNote(msg) {
+  $("noteBox").textContent = msg; $("noteBox").style.display = msg ? "block" : "none";
+}
+
+$("fetchForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const url = $("url").value.trim();
+  if (!url) return;
+  showError(""); showNote("");
+  $("fetchBtn").disabled = true;
+  $("fetchBtn").innerHTML = '<span class="spin"></span>';
+  try {
+    const r = await fetch("/api/info", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({url})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Could not fetch that URL.");
+    videoInfo = data;
+    $("thumb").src = data.thumbnail || "";
+    $("title").textContent = data.title;
+    $("channel").textContent = data.channel;
+    $("duration").textContent = fmtDur(data.duration);
+    $("views").textContent = fmtViews(data.views);
+    const sel = $("quality"); sel.innerHTML = "";
+    for (const o of data.options) {
+      const opt = document.createElement("option");
+      opt.value = o.id;
+      opt.textContent = o.label + (o.size ? `  ·  ~${o.size}` : "");
+      sel.appendChild(opt);
+    }
+    if (data.note) showNote(data.note);
+    $("videoCard").style.display = "block";
+    $("video").style.display = "flex";
+    $("dlCard").style.display = "none";
+  } catch (err) {
+    showError(err.message);
+    $("videoCard").style.display = "none";
+  } finally {
+    $("fetchBtn").disabled = false;
+    $("fetchBtn").textContent = "Fetch";
+  }
+});
+
+$("dlBtn").addEventListener("click", async () => {
+  $("dlBtn").disabled = true;
+  showError("");
+  try {
+    const r = await fetch("/api/download", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({url: videoInfo.url, quality: $("quality").value})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Could not start download.");
+    $("dlCard").style.display = "block";
+    $("progWrap").style.display = "block";
+    $("doneWrap").style.display = "none";
+    $("bar").classList.remove("indet");
+    $("barFill").style.width = "0%";
+    poll(data.job_id);
+  } catch (err) {
+    showError(err.message);
+    $("dlBtn").disabled = false;
+  }
+});
+
+function poll(jobId) {
+  clearTimeout(pollTimer);
+  const tick = async () => {
+    let s;
+    try {
+      const r = await fetch("/api/status/" + jobId);
+      s = await r.json();
+      if (!r.ok) throw new Error(s.error || "Job disappeared.");
+    } catch (err) {
+      $("phase").textContent = "Error";
+      showError(err.message);
+      $("dlBtn").disabled = false;
+      return;
+    }
+    $("phase").textContent = s.phase || s.status;
+    if (s.status === "downloading" && s.progress != null) {
+      $("bar").classList.remove("indet");
+      $("barFill").style.width = s.progress + "%";
+      $("pct").textContent = s.progress.toFixed(0) + "%";
+      const bits = [];
+      if (s.speed) bits.push(fmtSpeed(s.speed));
+      if (s.eta != null) bits.push("ETA " + fmtDur(s.eta));
+      $("speedEta").textContent = bits.join("  ·  ");
+    } else if (s.status === "processing" || s.status === "starting") {
+      $("bar").classList.add("indet");
+      $("pct").textContent = ""; $("speedEta").textContent = "";
+    }
+    if (s.status === "done") {
+      $("progWrap").style.display = "none";
+      $("doneWrap").style.display = "block";
+      $("fname").textContent = s.filename;
+      $("fsize").textContent = s.size ? `(${s.size})` : "";
+      $("saveLink").href = "/api/file/" + jobId;
+      $("dlBtn").disabled = false;
+      return;
+    }
+    if (s.status === "error") {
+      $("progWrap").style.display = "none";
+      showError(s.error || "Download failed.");
+      $("dlBtn").disabled = false;
+      return;
+    }
+    pollTimer = setTimeout(tick, 700);
+  };
+  tick();
+}
+
+$("againBtn").addEventListener("click", () => {
+  $("url").value = ""; $("urlCard").scrollIntoView({behavior: "smooth"});
+  $("url").focus();
+});
+</script>
+</body>
+</html>
